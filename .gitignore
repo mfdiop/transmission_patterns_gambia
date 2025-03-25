@@ -1,0 +1,12 @@
+.Rproj.user
+.Rhistory
+.RData
+.Ruserdata
+
+*.vcf
+*.docx
+*.pdf
+*.html
+data/
+results/
+submission/
