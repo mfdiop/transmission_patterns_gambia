@@ -135,9 +135,10 @@ summary_data <- function(data, thres = 0.25) {
    #                                         paste(sites.2, sites.1, sep = " - "))) %>% 
    #    dplyr::ungroup() %>% 
    
-   pairs_data <- ibd_metadata %>%
+   pairs_data <- data %>%
       select(c(1:3, 5, 14)) %>% 
-      dplyr::mutate(sites.1 = as.character(sites.1), sites.2 = as.character(sites.2),
+      dplyr::mutate(sites.1 = as.character(sites.1), 
+                    sites.2 = as.character(sites.2),
                     pair_location = ifelse(sites.1 < sites.2, 
                                            paste(sites.1, sites.2, sep = " - "), 
                                            paste(sites.2, sites.1, sep = " - "))) %>% 
@@ -221,6 +222,78 @@ summary_data <- function(data, thres = 0.25) {
 # 
 # ### plot membership probabilities
 # compoplot(vcf_dapc, lab="",ncol=1,col=mycol)
+
+counts <- function(data, column = "sites"){
+   data %>% 
+      group_by(across(all_of(column))) %>% 
+      count()
+}
+
+# Define the function for calculating highly related pairs and their confidence intervals
+calculate_relatedness_stats <- function(data, threshold = 0.25, filter_columns, group_column, filter_operator = "==") {
+   library(Hmisc)
+   
+   # # Create a filter expression dynamically
+   # filter_expr <- paste0("get(filter_columns[1]) ", filter_operator, " get(filter_columns[2])")
+   # 
+   # # Apply the filter
+   # filtered_data <- data %>%
+   #    filter(eval(parse(text = filter_expr))) %>%
+   #    mutate(HighlyRelated = ifelse(IBD > threshold, 1, 0))
+   # 
+   # # Determine the grouping variable dynamically
+   # if (filter_operator == "==") {
+   #    grouped_data <- filtered_data %>%
+   #       group_by(across(all_of(group_column)))
+   # } else {
+   #    grouped_data <- filtered_data %>%
+   #       group_by(across(all_of(filter_columns)))  # Groups by both columns if operator is not "=="
+   # }
+   
+   # Summarization step (same for both cases)
+   grouped_data <- data %>%
+      dplyr::mutate(HighlyRelated = ifelse(IBD > threshold, 1, 0)) %>% 
+      dplyr::group_by(across(all_of(filter_columns))) %>%
+      summarise(
+         sampleSize = n(),
+         MeanIBD = mean(IBD),
+         sdIBD = sd(IBD, na.rm = TRUE),
+         seIBD = sdIBD / sqrt(n()),
+         U95CI = MeanIBD + 1.96 * seIBD, 
+         L95CI = MeanIBD - 1.96 * seIBD,
+         nbre_hrp = sum(HighlyRelated),
+         fraction = (mean(IBD > threshold)),
+         SE = sqrt(fraction * (1 - fraction) / sampleSize), 
+         ymin = fraction - SE, 
+         ymax = fraction + SE,
+         
+         # Wilson Score Interval
+         CI_Lower = binconf(fraction * sampleSize, sampleSize, method = "wilson")[2],  
+         CI_Upper = binconf(fraction * sampleSize, sampleSize, method = "wilson")[3],   
+         
+         # Clopper-Pearson Exact Interval
+         lower_ci = binconf(fraction * sampleSize, sampleSize, method = "exact")[2],  
+         upper_ci = binconf(fraction * sampleSize, sampleSize, method = "exact")[3],   
+         
+         # Bayesian Shrinkage (Empirical Bayes)
+         # corectedFraction = EbayesThresh::ebayesthresh(HighlyRelatedRaw / SampleSize),
+         correctedFraction = ifelse(fraction != 0, EbayesThresh::ebayesthresh(fraction, 
+                                                                              prior = "laplace",
+                                                                              bayesfac = FALSE), 
+                                    NA),
+         
+         .groups = "drop")
+   
+   total_hrp <- sum(grouped_data$nbre_hrp)
+   
+   grouped_data <- grouped_data %>%
+      dplyr::mutate(
+         fraction_within_hrp = round((nbre_hrp / total_hrp)*100, 2), # Group percentage
+         fraction_hrp = round((nbre_hrp / sampleSize)*100, 2) # Location-specific percentage
+      )
+   
+   return(grouped_data)
+}
 
 
 
