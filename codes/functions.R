@@ -296,6 +296,34 @@ calculate_relatedness_stats <- function(data, threshold = 0.25, filter_columns, 
 }
 
 
+# ========================================================
+recap_v1 <- function(ibd.data){
+   
+   household <- ibd.data %>%
+      filter(Household == "Within household") %>%
+      mutate(site = "Household") %>%
+      select(p1, p2, IBD, site)
+   
+   compound <- ibd.data %>%
+      filter(Compound == "Within Compound") %>%
+      mutate(site = "Compound") %>%
+      select(p1, p2, IBD, site)
+   
+   village <- ibd.data %>%
+      filter(Village == "Within Village") %>%
+      mutate(site = "Village") %>%
+      select(p1, p2, IBD, site)
+   
+   region <- ibd.data %>%
+      filter(Region == "Within Region") %>%
+      mutate(site = "Region") %>%
+      select(p1, p2, IBD, site)
+   
+   results <- rbind.data.frame(household, compound, village, region)
+   return(results)
+}
+
+
 
 
 
